@@ -1,0 +1,93 @@
+This project has been developed for an internship at the OIST in the Luscombe Unit in 2017. MIT License.
+
+## Requirements & installation
+
+`library(mnormt)`
+`library(caret)`
+`library(MAST)`
+`library(bigstatsr)`
+`library(fastcluster)`
+`library(doParallel)`
+`library(parallel)`
+`library(foreach)`
+`library(doRNG)`
+`library(corpcor)`
+`library(stats)`
+`library(bigstatsr)`
+
+`install.packages("devtools")`
+`devtools::install_github("clreda/mineClusters")`
+
+## Workflow
+
+1. Filtering & normalization & feature selection for the input matrix.
+
+	- Remove null-variance features.
+	- Remove NA values.
+	- Trim "ubiquitous" & "rare" features with gene presence (non zero expression) frequency.
+	- Normalization according to sequencing length.
+	- log2-regularization.
+	- Feature selection according to feature correlation.
+
+2. Finding pattern matrix P (with MAST package).
+
+	- Fit binary logistic regression model for dropout probability.
+	- Fit binary logistic regression model for high-expressiveness probability.
+	- Gene expression pattern computed with function `thresholdSCRNACountMatrix` in `MAST` package.
+
+3. Fitting (over replicas of condition) copulas C_k for each condition k: 
+	each copula is a Gaussian copula with Gamma mixture margins.
+
+	- Overdispersion margin parameter: shrinkage estimation method by Yu et al. (2013).
+	- Mean margin parameter: using size factors computed by Anders et al. (2013).
+	- Mixture rate margin parameter: using model of dropout probability.
+	- Poisson margin parameter: set to 0.1 as done in SCDE paper of Kharchenko et al.
+	- Mean copula parameter: using peaks computed by function `thresholdSCRNACountMatrix` in `MAST` package.
+	- Overdispersion copula parameter: using shrinkage estimation function `cor.shrink` of `corpcor` package.
+
+4. Computation of the dissimilarity coefficients: 
+
+	D(k, l) = ||P_k-P_l||^2_2/|P| x (1-Pr(C_k <= Q_l) x Pr(C_l <= Q_k)) 
+	where Q_j = {(-1)^(P_{j, i}) x threshold_j}_{gene i}.
+
+5. Pivot-based correlation clustering, using the resulting dissimilarity matrix, that can help infering the cluster number given a 
+similarity cutoff value (between 0 and 1). Default threshold is 75th percentile of dissimilarity values. 
+
+Complete-linkage hierarchical clustering is then applied to the dissimilarity matrix, with the cluster number infered with the previous clustering, to get the final dendrogram and clustering.
+
+## Usage
+
+`results <- mineClusters(M, options=list(thres=d, replicates=NULL, thres_fs=0.75, X=6, normalized=F, islog=F, fast=F, parallel=T))`
+
+where:
+M is the gene expression matrix
+d is the cluster correlation percentile threshold (if < 1) or an expected cluster number (otherwise)
+replicates is an optional label of biological replicates
+thres_fs is the feature correlation threshold for feature selection
+X is the frequence threshold for feature filtering
+normalized is a logical which indicates if M is normalized
+islog is a logical which indicates if M is log-regularized
+fast is a logical which indicates if the fast version of mineClusters (w/o computing copulas) should be used
+parallel is a logical which indicates if multi-core threading should be used (it shouldn't if you use Windows)
+
+### For the regular version:
+`results` is a list of:
+             "clusters": vector of labels for each sample
+             "matrix": the trimmed normalized gene expression matrix             
+	     {"copulas": list of "functions": the list of copulas for each condition (group of samples) 
+						= list of cumulative prob. functions, 
+				"qtransf": the q-transformation associated with the margins, 
+				"params": list of copula and margin parameters
+             "pattern": pattern matrix computed by MAST}
+             "distance": dissimilarity matrix computed with the copulas 
+
+### For the fast version:
+`results` is a list of:
+             "clusters": vector of labels for each sample
+             "matrix": the trimmed normalized gene expression matrix    
+             "pattern": pattern matrix computed by MAST          
+             "distance": distance matrix computed with the copulas 
+
+## Tests
+
+See files `tests.R` (for quick benchmark of mineClusters) and `test_utils.R` (to test some of the assumptions made in mineClusters and functions used during the pipeline).

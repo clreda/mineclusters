@@ -1,0 +1,24 @@
+Package: mineClusters
+Type: Package
+Title: Clustering targeted at single-cell RNA seq data.
+Version: 1.0.0
+Date: 2018-05-15
+Author: Clémence Réda
+Maintainer: <creda@ens-paris-saclay.fr>
+Imports:
+    mnormt
+    caret
+    MAST
+    foreach
+    doParallel
+    doRNG
+    fastcluster
+    corpcor
+    stats
+    bigstatsr
+Depends:
+    R(>= 3.4)
+Description: This package provides a clustering algorithm for single-cell RNA seq data, that uses model distribution fitting and assumes that similar cell types have similar gene expression patterns to infer a dissimilarity matrix on which is applied a complete-linkage hierarchical clustering algorithm. README is about the assumptions and exact computations performed in the algorithm.
+License: MIT
+BugReports: https://github.com/clreda/mineClusters/issues
+URL: https://github.com/clreda/mineClusters/
